@@ -2,7 +2,7 @@
 
 To run the database: 
 1. ssh 'username'@tdt4225-01.idi.ntnu.no
-2. sudo mongod --bind_ip_all
+2. sudo mongod --bind_ip_all\
        If successful, you have now 
        a running MongoDB-server (the bind_ip_all flag opens for connections from any 
        IP-address, but don’t worry, we’ll use authentication). This server must be 
