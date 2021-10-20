@@ -11,7 +11,7 @@ class DBhandler:
 
     def print_documents(self, collection_name):
         collection = self.db[collection_name]
-        documents = collection.find({"_id":"181"})
+        documents = collection.find({})
         for doc in documents: 
             pprint(doc)
 
@@ -238,22 +238,47 @@ class DBhandler:
                     ]
                 }
             },
+            # convert id to int
+            {
+                "$project": { 
+                    "_id": 0, 
+                    "activity_id": { "$toInt": "$activities._id" },
+                    "activity_trackpoints": 1
+                }
+            },
+            # merge with trackpoints
             {
                "$lookup": {
-                    "from": "ActicityTrackPoint",
-                    "localField": "activities._id",
+                    "from": "ActivityTrackPoint",
+                    "localField": "activity_id",
                     "foreignField": "_id",
                     "as": "activity_trackpoints"
                 } 
             },
-            # "merge" user and activities
+            # unpack trackpoints
             {
                 "$unwind": "$activity_trackpoints"
             },
+            {
+                "$unwind": "$activity_trackpoints.trackpoints"
+            },
+            # project wanted fields
+            {
+                "$project": {
+                    "activity_id": 1,
+                    "trackpoint_id": "$activity_trackpoints.trackpoints._id",
+                    "lat": "$activity_trackpoints.trackpoints.lat",
+                    "lon": "$activity_trackpoints.trackpoints.lon",
+                }
+            },
         ])
-        res = []
+        res = {}
         for r in result:
-            res.append(r)
+            activity_id = str(r["activity_id"])
+            if activity_id not in res:
+                res[activity_id] = [(r["lat"], r["lon"])]
+            else:
+                res[activity_id].append((r["lat"], r["lon"]))
         return res
 
     def find_20_users_with_most_altitude_gain(self):
@@ -267,7 +292,7 @@ def main():
     program = None
     try:
         program = DBhandler()
-        #program.print_documents("User")
+        #program.print_documents("ActivityTrackPoint")
 
         """ 1. How many users, activities and trackpoints are there in the dataset (after it is
         inserted into the database). """
