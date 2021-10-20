@@ -15,8 +15,55 @@ class DBhandler:
         for doc in documents: 
             pprint(doc)
 
-    def get_num(self, table_name):
-        return []
+    def get_num_user(self):
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # Count _id from collection
+            {
+                "$group": { 
+                    "_id": "null",
+                    "count": {"$sum": 1} 
+                }
+            }
+        ])
+        for r in result:
+            return r["count"]
+        
+    def get_num_activity(self):
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" useer and activity
+            {
+                "$unwind": "$activities"
+            },
+            # Count _id from collection
+            {
+                "$group": { 
+                    "_id": "null",
+                    "count": {"$sum": 1} 
+                }
+            }
+        ])
+        for r in result:
+            return r["count"]
+
+    def get_num_trackpoint(self):
+        userCollection = self.db["ActivityTrackPoint"]
+        result = userCollection.aggregate([
+            # "merge" activity and trackpoints
+            {
+                "$unwind": "$trackpoints"
+            },
+            # Count _id from collection
+            {
+                "$group": { 
+                    "_id": "null",
+                    "count": {"$sum": 1} 
+                }
+            }
+        ])
+        for r in result:
+            return r["count"]
 
     def get_avg_activities_for_user(self):
         return 0
@@ -296,9 +343,9 @@ def main():
 
         """ 1. How many users, activities and trackpoints are there in the dataset (after it is
         inserted into the database). """
-        #print("Number of users: ", program.get_num("User"))
-        #print("Number of activities: ", program.get_num("Activity"))
-        #print("Number of trackpoints: ", program.get_num("TrackPoint"))
+        #print("Number of users: ", program.get_num_user())
+        #print("Number of activities: ", program.get_num_activity())
+        #print("Number of trackpoints: ", program.get_num_trackpoint())
 
         """ 2. Find the average, minimum and maximum number of activities per user. """
         #avg_activity_for_all_users = program.get_avg_activities_for_user()
