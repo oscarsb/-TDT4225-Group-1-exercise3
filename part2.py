@@ -11,7 +11,7 @@ class DBhandler:
 
     def print_documents(self, collection_name):
         collection = self.db[collection_name]
-        documents = collection.find({})
+        documents = collection.find({"_id":"181"})
         for doc in documents: 
             pprint(doc)
 
@@ -61,7 +61,9 @@ class DBhandler:
         result = userCollection.find(
             # find users with no activities using taxi
             { 
-                "activities.transportation_mode": { "$not": { "$regex": "taxi" }}
+                "activities.transportation_mode": { 
+                    "$not": { "$regex": "taxi" }
+                }
             }
         )
         res = []
@@ -82,7 +84,7 @@ class DBhandler:
                 "$match": {
                     "activities.transportation_mode": { 
                         "$not": { "$regex": "NULL" }
-                        }
+                    }
                 }
             },
             # group transportation mode and user id
@@ -210,7 +212,49 @@ class DBhandler:
         return res[:2]
 
     def find_distance_walked_in_year_by_user(self, year, user_id):
-        return []
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" user and activities
+            {
+                "$unwind": "$activities"
+            },
+            # get user 112's walking activities
+            { 
+                "$match": {
+                    "_id" : f"{user_id}",
+                    "activities.transportation_mode" : "walk"
+                }
+            },
+            # in year 2008
+            { 
+                "$redact": {
+                    "$cond": [
+                        { "$eq": [ { "$year": { "$dateFromString": { 
+                            "format": "%Y-%m-%d %H:%M:%S",
+                            "dateString": "$activities.start_date_time" 
+                        }}}, year ]},
+                        "$$KEEP",
+                        "$$PRUNE"
+                    ]
+                }
+            },
+            {
+               "$lookup": {
+                    "from": "ActicityTrackPoint",
+                    "localField": "activities._id",
+                    "foreignField": "_id",
+                    "as": "activity_trackpoints"
+                } 
+            },
+            # "merge" user and activities
+            {
+                "$unwind": "$activity_trackpoints"
+            },
+        ])
+        res = []
+        for r in result:
+            res.append(r)
+        return res
 
     def find_20_users_with_most_altitude_gain(self):
         return []
