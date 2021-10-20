@@ -28,13 +28,24 @@ class DBhandler:
         return []
 
     def get_top_10_users_with_most_activities(self):
-        # might be useful as starting point
-        result = self.db["User"].aggregate([
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # show user id and size of activities list for user
             { 
-                "$project": { "_id":1, "activities": { "$size": "$activities"}}
+                "$project": { 
+                    "_id": 1, 
+                    "activities": { "$size": "$activities"}
+                }
+            },
+            # sort on highest count 
+            {
+                "$sort": { "activities": -1 }
             }
         ])
-        return []
+        res = []
+        for r in result:
+            res.append(r)
+        return res[:10]
         
     def ended_activity_at_the_next_day(self):
         return []
@@ -69,10 +80,12 @@ class DBhandler:
             # ignore activities with no tranportation mode
             { 
                 "$match": {
-                    "activities.transportation_mode": { "$not": { "$regex": "NULL" }}
+                    "activities.transportation_mode": { 
+                        "$not": { "$regex": "NULL" }
+                        }
                 }
             },
-            # group transportation mode and user id to get 
+            # group transportation mode and user id
             {
                 "$group": {
                     "_id": {
@@ -95,10 +108,106 @@ class DBhandler:
         return res
 
     def find_date_with_most_activities(self):
-        return []
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" user and activities
+            {
+                "$unwind": "$activities"
+            },
+            # group on year and month and count
+            {
+                "$group": {
+                    "_id": {
+                        "year": { "$year": { 
+                            "$dateFromString": { 
+                                "format": "%Y-%m-%d %H:%M:%S",
+                                "dateString": "$activities.start_date_time"
+                            }
+                        }},
+                        "month": { "$month": { 
+                            "$dateFromString": { 
+                                "format": "%Y-%m-%d %H:%M:%S",
+                                "dateString": "$activities.start_date_time"
+                            }
+                        }}
+                    },
+                    "count": { "$sum": 1 }
+                }
+            },
+            # sort on highest count 
+            {
+                "$sort": { "count": -1 }
+            }
+        ])
+        for r in result:
+            # return first
+            return r["_id"]["year"], r["_id"]["month"]
 
     def find_user_with_most_activities(self):
-        return []
+        year, month = self.find_date_with_most_activities()
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" user and activities
+            {
+                "$unwind": "$activities"
+            },
+            # get activities in most active year and month
+            { 
+                "$redact": {
+                    "$cond": [
+                        { 
+                            "$and": [ 
+                                { "$eq": [ { "$year": { "$dateFromString": { 
+                                    "format": "%Y-%m-%d %H:%M:%S",
+                                    "dateString": "$activities.start_date_time" 
+                                }}}, year ]},
+                                { "$eq": [ { "$month": { "$dateFromString": { 
+                                    "format": "%Y-%m-%d %H:%M:%S",
+                                    "dateString": "$activities.start_date_time" 
+                                }}}, month ]}
+                            ] 
+                        },
+                        "$$KEEP",
+                        "$$PRUNE"
+                    ]
+                }
+            },
+            # group on user id, count activities and calculate total hours
+            {
+                "$group": {
+                    "_id": "$_id",
+                    "count": { "$sum": 1 },
+                    "hours": { 
+                        "$sum": {
+                            "$divide": [{ 
+                                "$subtract": [
+                                    { 
+                                        "$dateFromString": { 
+                                            "format": "%Y-%m-%d %H:%M:%S",
+                                            "dateString": "$activities.end_date_time"
+                                        }
+                                    },
+                                    { 
+                                        "$dateFromString": { 
+                                            "format": "%Y-%m-%d %H:%M:%S",
+                                            "dateString": "$activities.start_date_time"
+                                        }
+                                    }
+                                ]
+                            }, 3600000]
+                        }
+                    }
+                }
+            },
+            # sort on highest count 
+            {
+                "$sort": { "count": -1 }
+            }
+        ])
+        res = []
+        for r in result:
+            res.append((r["_id"], r["count"], round(r["hours"], 1)))
+        return res[:2]
 
     def find_distance_walked_in_year_by_user(self, year, user_id):
         return []
@@ -123,7 +232,7 @@ def main():
         #print("Number of trackpoints: ", program.get_num("TrackPoint"))
 
         """ 2. Find the average, minimum and maximum number of activities per user. """
-        avg_activity_for_all_users = program.get_avg_activities_for_user()
+        #avg_activity_for_all_users = program.get_avg_activities_for_user()
         #print("Avrage activities for all users: ", avg_activity_for_all_users, "≈", round(avg_activity_for_all_users, 1))
         #print("Maximum number of activities: ", program.get_max_activities_for_user())
         #print("Minimum number of activities: ", program.get_min_activities_for_user())
@@ -131,6 +240,7 @@ def main():
         """ 3. Find the top 10 users with the highest number of activities. """
         #print("TOP 10 users with the highest number of activities:")
         #pprint(program.get_top_10_users_with_most_activities())
+        #print()
 
         """ 4. Find the number of users that have started the activity in one day and ended
         the activity the next day. """
@@ -150,23 +260,24 @@ def main():
 
         """ 7. Find all users that have never taken a taxi. """
         #print("Users that have never taken a taxi:")
-        #print(program.find_users_with_no_taxi())
+        #print(program.find_users_with_no_taxi(), '\n')
 
         """ 8. Find all types of transportation modes and count how many distinct users that 
         have used the different transportation modes. Do not count the rows where the
         transportation mode is null. """
         #print("Number of distinct users that have used the different transportation modes:")
-        #print(tabulate(program.count_users_per_transport_mode()))
+        #print(tabulate(program.count_users_per_transport_mode()), '\n')
 
         """ 9. a) Find the year and month with the most activities. """
         #print("The year and month with the most activities:")
-        #pprint(program.find_date_with_most_activities())
+        #print(program.find_date_with_most_activities(), '\n')
 
         """ 9. b) Which user had the most activities this year and month, and how many
         recorded hours do they have? Do they have more hours recorded than the user
         with the second most activities? """
         #print("The two users with the most activities that year and month:")
-        #pprint(program.find_user_with_most_activities())
+        #headers = ["user id", "number of activities", "hours recorded"]
+        #print(tabulate(program.find_user_with_most_activities(), headers=headers), '\n')
 
         """ 10. Find the total distance (in km) walked in 2008, by user with id=112. """
         #print("Total distance walked by user 112 in 2008:")
