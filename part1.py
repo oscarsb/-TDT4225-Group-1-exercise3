@@ -13,7 +13,7 @@ class DBhandler:
         self.client = self.connection.client
         self.db = self.connection.db
         
-        self.collections = ["User", "TrackPoint"]
+        self.collections = ["User", "ActivityTrackPoint"]
         self.activity_id = 1
         self.trackpoint_id = 1
         
@@ -164,7 +164,7 @@ class DBhandler:
     def insert_trackpoint_documents(self, trackpoints):      
         """Inserts list of trackpoints, 
         assumes TrackPoint table exists"""  
-        docs = []          
+        points = []          
         
         for track in trackpoints:
             track_format = {
@@ -172,23 +172,27 @@ class DBhandler:
                 "lat": track[0],
                 "lon": track[1],
                 "altitude": track[3],
-                "date_time": f"{track[5]}",
-                "activity_id": self.activity_id
+                "date_time": f"{track[5]}"
             }
-            docs.append(track_format)
+            points.append(track_format)
             self.trackpoint_id += 1
+
+        doc = {
+            "_id": self.activity_id,
+            "trackpoints": points
+        }
             
-        collection = self.db["TrackPoint"]
-        collection.insert_many(docs)
+        collection = self.db["ActivityTrackPoint"]
+        collection.insert_one(doc)
 
 
 def main():
     program = None
     try:
         program = DBhandler()
-        #program.drop_collections()
-        #program.create_collections()
-        #program.insert_data()
+        program.drop_collections()
+        program.create_collections()
+        program.insert_data()
     except Exception as e:
         print("ERROR: Failed to use database:", e)
     finally:
