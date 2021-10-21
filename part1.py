@@ -1,3 +1,4 @@
+from datetime import datetime
 from pprint import pprint 
 from DbConnector import DbConnector
 import constants
@@ -94,7 +95,7 @@ class DBhandler:
         # adds user with activities when trackpoints are inserted and activities retrieved
         for user in tqdm(users, ncols=100, leave=False, desc="Inserting data from all users"):
             user_format = {
-                "_id": f"{user[0]}",
+                "_id": f"{int(user[0])}",
                 "has_labels": user[1],
                 "activities": self.get_user_activities_and_insert_trackpoints(user[0])
             }
@@ -130,9 +131,16 @@ class DBhandler:
             # format each trackPoint and add all values to list
             for line in track_raw:
                 formated = line.replace(",", " ").split()
-                # change date and time format to match datetime
+                # change date and time format to datetime
                 formated[5] = f"{formated[5]} {formated[6]}"
+                formated[5] = datetime.strptime(formated[5], '%Y-%m-%d %H:%M:%S')
                 formated.remove(formated[-1])  # remove time
+                # change values to int
+                formated[0] = float(formated[0])
+                formated[1] = float(formated[1])
+                formated[2] = int(formated[2])
+                formated[3] = float(formated[3])
+                formated[4] = float(formated[4])
 
                 track_points.append(formated)
                 
@@ -151,10 +159,10 @@ class DBhandler:
             
             # create activity doc
             doc = {
-                "_id": f"{self.activity_id}",
-                "transportation_mode": f"{transportation}",
-                "start_date_time": f"{startDatetime}",
-                "end_date_time": f"{endDatetime}"
+                "_id": self.activity_id,
+                "transportation_mode": transportation,
+                "start_date_time": startDatetime,
+                "end_date_time": endDatetime
             }
             self.activity_id += 1
             activities.append(doc)
