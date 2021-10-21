@@ -1,5 +1,4 @@
 from datetime import datetime
-from pprint import pprint 
 from DbConnector import DbConnector
 import constants
 from pathlib import Path
@@ -62,6 +61,9 @@ class DBhandler:
                     val = i.replace("/", "-")
                     val = val.replace("_", " ")
                     tmp_label.append(val)
+
+                tmp_label[0] = datetime.strptime(tmp_label[0], '%Y-%m-%d %H:%M:%S')
+                tmp_label[1] = datetime.strptime(tmp_label[1], '%Y-%m-%d %H:%M:%S')
 
                 label_formated.append(tmp_label)  # add formated label data
 
