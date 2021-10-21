@@ -1,6 +1,7 @@
 from pprint import pprint 
 from DbConnector import DbConnector
 from tabulate import tabulate
+from haversine import haversine, Unit
 
 
 class DBhandler:
@@ -285,12 +286,11 @@ class DBhandler:
                     ]
                 }
             },
-            # convert id to int
+            # convert activity id to int
             {
                 "$project": { 
                     "_id": 0, 
-                    "activity_id": { "$toInt": "$activities._id" },
-                    "activity_trackpoints": 1
+                    "activity_id": { "$toInt": "$activities._id" }
                 }
             },
             # merge with trackpoints
@@ -315,21 +315,88 @@ class DBhandler:
                     "activity_id": 1,
                     "trackpoint_id": "$activity_trackpoints.trackpoints._id",
                     "lat": "$activity_trackpoints.trackpoints.lat",
-                    "lon": "$activity_trackpoints.trackpoints.lon",
+                    "lon": "$activity_trackpoints.trackpoints.lon"
                 }
             },
         ])
-        res = {}
+        dict = {}
         for r in result:
             activity_id = str(r["activity_id"])
-            if activity_id not in res:
-                res[activity_id] = [(r["lat"], r["lon"])]
+            if activity_id not in dict:
+                dict[activity_id] = [(float(r["lat"]), float(r["lon"]))]
             else:
-                res[activity_id].append((r["lat"], r["lon"]))
-        return res
+                dict[activity_id].append((float(r["lat"]), float(r["lon"])))
+
+        dist = 0
+        for activity_id, trackpoints in dict.items():
+            for i in range(1, len(trackpoints)):
+                dist += haversine(trackpoints[i], trackpoints[i-1])
+        return round(dist, 1)
 
     def find_20_users_with_most_altitude_gain(self):
-        return []
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" user and activities
+            {
+                "$unwind": "$activities"
+            },
+            # convert activity id to int
+            {
+                "$project": { 
+                    "_id": 1, 
+                    "activity_id": { "$toInt": "$activities._id" }
+                }
+            },
+            # merge with trackpoints
+            {
+               "$lookup": {
+                    "from": "ActivityTrackPoint",
+                    "localField": "activity_id",
+                    "foreignField": "_id",
+                    "as": "activity_trackpoints"
+                } 
+            },
+            # unpack trackpoints
+            {
+                "$unwind": "$activity_trackpoints"
+            },
+            {
+                "$unwind": "$activity_trackpoints.trackpoints"
+            },
+            # project wanted fields
+            {
+                "$project": {
+                    "_id": 1,
+                    "activity_id": 1,
+                    "trackpoint_id": "$activity_trackpoints.trackpoints._id",
+                    "altitude": "$activity_trackpoints.trackpoints.altitude"
+                }
+            },
+        ])
+        dict = {}
+        for r in result:
+            user_id = r["_id"]
+            activity_id = str(r["activity_id"])
+            altitude = r["altitude"]
+            if user_id not in dict:
+                dict[user_id] = {activity_id: [altitude]}
+            else:
+                if activity_id not in dict[user_id]:
+                    dict[user_id][activity_id] = [altitude]
+                else:
+                    dict[user_id][activity_id].append(altitude)
+
+        user_gains = {}
+        for user_id, activities in dict.items():
+            gain = 0
+            for activity_id, altitudes in activities.items():
+                for i in range(1, len(altitudes)):
+                    if altitudes[i] > altitudes[i-1]:
+                        gain += altitudes[i] - altitudes[i-1]
+            user_gains[user_id] = round(gain*0.3048)
+
+        sorted_user_gains = dict(sorted(user_gains.items(), key=lambda item: item[1], reverse=True))
+        return [(list(sorted_user_gains.keys())[i], list(sorted_user_gains.values())[i]) for i in range(0, 20)]
 
     def find_all_users_with_invalid_activities(self):
         return []
@@ -397,14 +464,14 @@ def main():
 
         """ 10. Find the total distance (in km) walked in 2008, by user with id=112. """
         #print("Total distance walked by user 112 in 2008:")
-        #pprint(program.find_distance_walked_in_year_by_user(2008, 112), "km")
+        #print(program.find_distance_walked_in_year_by_user(2008, 112), "km")
 
         """ 11. Find the top 20 users who have gained the most altitude meters.
             Output should be a table with (id, total meters gained per user).
             Remember that some altitude-values are invalid
             Tip: (tpn.altitude-tpn-1.altitude), tpn.altitude >tpn-1.altitude """
-        #print("Top 20 users who have gained the most altitude meters:")
-        #pprint(program.find_20_users_with_most_altitude_gain())
+        print("Top 20 users who have gained the most altitude meters:")
+        print(tabulate(program.find_20_users_with_most_altitude_gain()))
 
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
