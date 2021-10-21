@@ -10,12 +10,6 @@ class DBhandler:
         self.client = self.connection.client
         self.db = self.connection.db 
 
-    def print_documents(self, collection_name):
-        collection = self.db[collection_name]
-        documents = collection.find({})
-        for doc in documents: 
-            pprint(doc)
-
     def get_num_user(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
@@ -406,7 +400,6 @@ def main():
     program = None
     try:
         program = DBhandler()
-        #program.print_documents("ActivityTrackPoint")
 
         """ 1. How many users, activities and trackpoints are there in the dataset (after it is
         inserted into the database). """
