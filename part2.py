@@ -373,21 +373,21 @@ class DBhandler:
                 }
             },
         ])
-        dict = {}
+        result_dict = {}
         for r in result:
             user_id = r["_id"]
             activity_id = str(r["activity_id"])
-            altitude = r["altitude"]
-            if user_id not in dict:
-                dict[user_id] = {activity_id: [altitude]}
+            altitude = float(r["altitude"])
+            if user_id not in result_dict:
+                result_dict[user_id] = {activity_id: [altitude]}
             else:
-                if activity_id not in dict[user_id]:
-                    dict[user_id][activity_id] = [altitude]
+                if activity_id not in result_dict[user_id]:
+                    result_dict[user_id][activity_id] = [altitude]
                 else:
-                    dict[user_id][activity_id].append(altitude)
+                    result_dict[user_id][activity_id].append(altitude)
 
         user_gains = {}
-        for user_id, activities in dict.items():
+        for user_id, activities in result_dict.items():
             gain = 0
             for activity_id, altitudes in activities.items():
                 for i in range(1, len(altitudes)):
@@ -470,8 +470,9 @@ def main():
             Output should be a table with (id, total meters gained per user).
             Remember that some altitude-values are invalid
             Tip: (tpn.altitude-tpn-1.altitude), tpn.altitude >tpn-1.altitude """
-        print("Top 20 users who have gained the most altitude meters:")
-        print(tabulate(program.find_20_users_with_most_altitude_gain()))
+        #print("Top 20 users who have gained the most altitude meters:")
+        #headers=["user id", "altitude gained"]
+        #print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers))
 
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
