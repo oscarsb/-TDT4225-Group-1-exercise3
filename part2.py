@@ -86,7 +86,7 @@ class DBhandler:
         ])
         res = []
         for r in result:
-            res.append(r)
+            res.append((r["_id"], r["activities"]))
         return res[:10]
         
     def ended_activity_at_the_next_day(self):
@@ -405,7 +405,7 @@ def main():
         inserted into the database). """
         #print("Number of users: ", program.get_num_user())
         #print("Number of activities: ", program.get_num_activity())
-        #print("Number of trackpoints: ", program.get_num_trackpoint())
+        #print("Number of trackpoints: ", program.get_num_trackpoint(), '\n')
 
         """ 2. Find the average, minimum and maximum number of activities per user. """
         #avg_activity_for_all_users = program.get_avg_activities_for_user()
@@ -414,9 +414,9 @@ def main():
         #print("Minimum number of activities: ", program.get_min_activities_for_user())
 
         """ 3. Find the top 10 users with the highest number of activities. """
-        #print("TOP 10 users with the highest number of activities:")
-        #pprint(program.get_top_10_users_with_most_activities())
-        #print()
+        #print("Top 10 users with the highest number of activities:")
+        #headers = ["User id", "Number of activities"]
+        #print(tabulate(program.get_top_10_users_with_most_activities(), headers=headers), '\n')
 
         """ 4. Find the number of users that have started the activity in one day and ended
         the activity the next day. """
@@ -442,7 +442,8 @@ def main():
         have used the different transportation modes. Do not count the rows where the
         transportation mode is null. """
         #print("Number of distinct users that have used the different transportation modes:")
-        #print(tabulate(program.count_users_per_transport_mode()), '\n')
+        #headers = ["Transportation mode", "Number of users"]
+        #print(tabulate(program.count_users_per_transport_mode(), headers=headers), '\n')
 
         """ 9. a) Find the year and month with the most activities. """
         #print("The year and month with the most activities:")
@@ -452,20 +453,20 @@ def main():
         recorded hours do they have? Do they have more hours recorded than the user
         with the second most activities? """
         #print("The two users with the most activities that year and month:")
-        #headers = ["user id", "number of activities", "hours recorded"]
+        #headers = ["User id", "Number of activities", "Hours recorded"]
         #print(tabulate(program.find_user_with_most_activities(), headers=headers), '\n')
 
         """ 10. Find the total distance (in km) walked in 2008, by user with id=112. """
         #print("Total distance walked by user 112 in 2008:")
-        #print(program.find_distance_walked_in_year_by_user(2008, 112), "km")
+        #print(program.find_distance_walked_in_year_by_user(2008, 112), "km\n")
 
         """ 11. Find the top 20 users who have gained the most altitude meters.
             Output should be a table with (id, total meters gained per user).
             Remember that some altitude-values are invalid
             Tip: (tpn.altitude-tpn-1.altitude), tpn.altitude >tpn-1.altitude """
         #print("Top 20 users who have gained the most altitude meters:")
-        #headers=["user id", "altitude gained"]
-        #print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers))
+        #headers=["User id", "Altitude gained"]
+        #print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers), '\n')
 
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
