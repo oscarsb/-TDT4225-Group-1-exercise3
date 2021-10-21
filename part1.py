@@ -97,7 +97,7 @@ class DBhandler:
         # adds user with activities when trackpoints are inserted and activities retrieved
         for user in tqdm(users, ncols=100, leave=False, desc="Inserting data from all users"):
             user_format = {
-                "_id": f"{int(user[0])}",
+                "_id": int(user[0]),
                 "has_labels": user[1],
                 "activities": self.get_user_activities_and_insert_trackpoints(user[0])
             }
