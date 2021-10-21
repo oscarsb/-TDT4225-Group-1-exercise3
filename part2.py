@@ -1,7 +1,6 @@
 from pprint import pprint 
 from DbConnector import DbConnector
 from tabulate import tabulate
-from haversine import haversine, Unit
 
 
 class DBhandler:
@@ -9,6 +8,12 @@ class DBhandler:
         self.connection = DbConnector()
         self.client = self.connection.client
         self.db = self.connection.db 
+
+    def print_documents(self, collection_name):
+        collection = self.db[collection_name]
+        documents = collection.find({})
+        for doc in documents: 
+            pprint(doc)
 
     def get_num_user(self):
         userCollection = self.db["User"]
@@ -61,13 +66,70 @@ class DBhandler:
             return r["count"]
 
     def get_avg_activities_for_user(self):
-        return 0
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+
+            # Count _id from collection
+            {
+                "$project": { 
+                    "_id": 1,
+                    "count":  {"$size": "$activities"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "null",
+                    "avg": {"$avg": "$count"}
+                }
+            }
+        ])
+
+        for r in result:
+            return r["avg"]
+
 
     def get_max_activities_for_user(self):
-        return []
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # Count _id from collection
+            {
+                "$project": { 
+                    "_id": 1,
+                    "count":  {"$size": "$activities"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "null",
+                    "max": {"$max": "$count"}
+                }
+            }
+        ])
+
+        for r in result:
+            return (r["max"])
+
 
     def get_min_activities_for_user(self):
-        return []
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # Count _id from collection
+            {
+                "$project": { 
+                    "_id": 1,
+                    "count":  {"$size": "$activities"}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "null",
+                    "min": {"$min": "$count"}
+                }
+            }
+        ])
+
+        for r in result:
+            return (r["min"])
 
     def get_top_10_users_with_most_activities(self):
         userCollection = self.db["User"]
@@ -86,7 +148,7 @@ class DBhandler:
         ])
         res = []
         for r in result:
-            res.append((r["_id"], r["activities"]))
+            res.append(r)
         return res[:10]
         
     def ended_activity_at_the_next_day(self):
@@ -103,9 +165,7 @@ class DBhandler:
         result = userCollection.find(
             # find users with no activities using taxi
             { 
-                "activities.transportation_mode": { 
-                    "$not": { "$regex": "taxi" }
-                }
+                "activities.transportation_mode": { "$not": { "$regex": "taxi" }}
             }
         )
         res = []
@@ -126,7 +186,7 @@ class DBhandler:
                 "$match": {
                     "activities.transportation_mode": { 
                         "$not": { "$regex": "NULL" }
-                    }
+                        }
                 }
             },
             # group transportation mode and user id
@@ -254,143 +314,10 @@ class DBhandler:
         return res[:2]
 
     def find_distance_walked_in_year_by_user(self, year, user_id):
-        userCollection = self.db["User"]
-        result = userCollection.aggregate([
-            # "merge" user and activities
-            {
-                "$unwind": "$activities"
-            },
-            # get user 112's walking activities
-            { 
-                "$match": {
-                    "_id" : f"{user_id}",
-                    "activities.transportation_mode" : "walk"
-                }
-            },
-            # in year 2008
-            { 
-                "$redact": {
-                    "$cond": [
-                        { "$eq": [ { "$year": { "$dateFromString": { 
-                            "format": "%Y-%m-%d %H:%M:%S",
-                            "dateString": "$activities.start_date_time" 
-                        }}}, year ]},
-                        "$$KEEP",
-                        "$$PRUNE"
-                    ]
-                }
-            },
-            # convert activity id to int
-            {
-                "$project": { 
-                    "_id": 0, 
-                    "activity_id": { "$toInt": "$activities._id" }
-                }
-            },
-            # merge with trackpoints
-            {
-               "$lookup": {
-                    "from": "ActivityTrackPoint",
-                    "localField": "activity_id",
-                    "foreignField": "_id",
-                    "as": "activity_trackpoints"
-                } 
-            },
-            # unpack trackpoints
-            {
-                "$unwind": "$activity_trackpoints"
-            },
-            {
-                "$unwind": "$activity_trackpoints.trackpoints"
-            },
-            # project wanted fields
-            {
-                "$project": {
-                    "activity_id": 1,
-                    "trackpoint_id": "$activity_trackpoints.trackpoints._id",
-                    "lat": "$activity_trackpoints.trackpoints.lat",
-                    "lon": "$activity_trackpoints.trackpoints.lon"
-                }
-            },
-        ])
-        dict = {}
-        for r in result:
-            activity_id = str(r["activity_id"])
-            if activity_id not in dict:
-                dict[activity_id] = [(float(r["lat"]), float(r["lon"]))]
-            else:
-                dict[activity_id].append((float(r["lat"]), float(r["lon"])))
-
-        dist = 0
-        for activity_id, trackpoints in dict.items():
-            for i in range(1, len(trackpoints)):
-                dist += haversine(trackpoints[i], trackpoints[i-1])
-        return round(dist, 1)
+        return []
 
     def find_20_users_with_most_altitude_gain(self):
-        userCollection = self.db["User"]
-        result = userCollection.aggregate([
-            # "merge" user and activities
-            {
-                "$unwind": "$activities"
-            },
-            # convert activity id to int
-            {
-                "$project": { 
-                    "_id": 1, 
-                    "activity_id": { "$toInt": "$activities._id" }
-                }
-            },
-            # merge with trackpoints
-            {
-               "$lookup": {
-                    "from": "ActivityTrackPoint",
-                    "localField": "activity_id",
-                    "foreignField": "_id",
-                    "as": "activity_trackpoints"
-                } 
-            },
-            # unpack trackpoints
-            {
-                "$unwind": "$activity_trackpoints"
-            },
-            {
-                "$unwind": "$activity_trackpoints.trackpoints"
-            },
-            # project wanted fields
-            {
-                "$project": {
-                    "_id": 1,
-                    "activity_id": 1,
-                    "trackpoint_id": "$activity_trackpoints.trackpoints._id",
-                    "altitude": "$activity_trackpoints.trackpoints.altitude"
-                }
-            },
-        ])
-        result_dict = {}
-        for r in result:
-            user_id = r["_id"]
-            activity_id = str(r["activity_id"])
-            altitude = float(r["altitude"])
-            if user_id not in result_dict:
-                result_dict[user_id] = {activity_id: [altitude]}
-            else:
-                if activity_id not in result_dict[user_id]:
-                    result_dict[user_id][activity_id] = [altitude]
-                else:
-                    result_dict[user_id][activity_id].append(altitude)
-
-        user_gains = {}
-        for user_id, activities in result_dict.items():
-            gain = 0
-            for activity_id, altitudes in activities.items():
-                for i in range(1, len(altitudes)):
-                    if altitudes[i] > altitudes[i-1]:
-                        gain += altitudes[i] - altitudes[i-1]
-            user_gains[user_id] = round(gain*0.3048)
-
-        sorted_user_gains = dict(sorted(user_gains.items(), key=lambda item: item[1], reverse=True))
-        return [(list(sorted_user_gains.keys())[i], list(sorted_user_gains.values())[i]) for i in range(0, 20)]
+        return []
 
     def find_all_users_with_invalid_activities(self):
         return []
@@ -400,23 +327,24 @@ def main():
     program = None
     try:
         program = DBhandler()
+        #program.print_documents("User")
 
         """ 1. How many users, activities and trackpoints are there in the dataset (after it is
         inserted into the database). """
         #print("Number of users: ", program.get_num_user())
         #print("Number of activities: ", program.get_num_activity())
-        #print("Number of trackpoints: ", program.get_num_trackpoint(), '\n')
+        #print("Number of trackpoints: ", program.get_num_trackpoint())
 
         """ 2. Find the average, minimum and maximum number of activities per user. """
-        #avg_activity_for_all_users = program.get_avg_activities_for_user()
+        avg_activity_for_all_users = program.get_avg_activities_for_user()
         #print("Avrage activities for all users: ", avg_activity_for_all_users, "≈", round(avg_activity_for_all_users, 1))
         #print("Maximum number of activities: ", program.get_max_activities_for_user())
-        #print("Minimum number of activities: ", program.get_min_activities_for_user())
+        print("Minimum number of activities: ", program.get_min_activities_for_user())
 
         """ 3. Find the top 10 users with the highest number of activities. """
-        #print("Top 10 users with the highest number of activities:")
-        #headers = ["User id", "Number of activities"]
-        #print(tabulate(program.get_top_10_users_with_most_activities(), headers=headers), '\n')
+        #print("TOP 10 users with the highest number of activities:")
+        #pprint(program.get_top_10_users_with_most_activities())
+        #print()
 
         """ 4. Find the number of users that have started the activity in one day and ended
         the activity the next day. """
@@ -442,8 +370,7 @@ def main():
         have used the different transportation modes. Do not count the rows where the
         transportation mode is null. """
         #print("Number of distinct users that have used the different transportation modes:")
-        #headers = ["Transportation mode", "Number of users"]
-        #print(tabulate(program.count_users_per_transport_mode(), headers=headers), '\n')
+        #print(tabulate(program.count_users_per_transport_mode()), '\n')
 
         """ 9. a) Find the year and month with the most activities. """
         #print("The year and month with the most activities:")
@@ -453,20 +380,19 @@ def main():
         recorded hours do they have? Do they have more hours recorded than the user
         with the second most activities? """
         #print("The two users with the most activities that year and month:")
-        #headers = ["User id", "Number of activities", "Hours recorded"]
+        #headers = ["user id", "number of activities", "hours recorded"]
         #print(tabulate(program.find_user_with_most_activities(), headers=headers), '\n')
 
         """ 10. Find the total distance (in km) walked in 2008, by user with id=112. """
         #print("Total distance walked by user 112 in 2008:")
-        #print(program.find_distance_walked_in_year_by_user(2008, 112), "km\n")
+        #pprint(program.find_distance_walked_in_year_by_user(2008, 112), "km")
 
         """ 11. Find the top 20 users who have gained the most altitude meters.
             Output should be a table with (id, total meters gained per user).
             Remember that some altitude-values are invalid
             Tip: (tpn.altitude-tpn-1.altitude), tpn.altitude >tpn-1.altitude """
         #print("Top 20 users who have gained the most altitude meters:")
-        #headers=["User id", "Altitude gained"]
-        #print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers), '\n')
+        #pprint(program.find_20_users_with_most_altitude_gain())
 
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
