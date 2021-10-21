@@ -1,6 +1,7 @@
 from pprint import pprint 
 from DbConnector import DbConnector
 from tabulate import tabulate
+from datetime import datetime, timedelta
 
 
 class DBhandler:
@@ -320,9 +321,97 @@ class DBhandler:
         return []
 
     def find_all_users_with_invalid_activities(self):
-        return []
-    
+        userCollection = self.db["User"]
+        result = userCollection.aggregate([
+            # "merge" user and activities
+            {
+                "$unwind": "$activities"
+            },
+            # convert activity id to int
+            {
+                "$project": {
+                    "_id": 1,
+                    "activity_id": {"$toInt": "$activities._id"}
+                }
+            },
+            # merge with trackpoints
+            {
+                "$lookup": {
+                    "from": "ActivityTrackPoint",
+                    "localField": "activity_id",
+                    "foreignField": "_id",
+                    "as": "activity_trackpoints"
+                }
+            },
+            # unpack trackpoints
+            {
+                "$unwind": "$activity_trackpoints"
+            },
+            {
+                "$unwind": "$activity_trackpoints.trackpoints"
+            },
+            # project wanted fields
+            {
+                "$project": {
+                    "_id": 1,
+                    "activity_id": 1,
+                    "trackpoint_id": "$activity_trackpoints.trackpoints._id",
+                    "date_time": "$activity_trackpoints.trackpoints.date_time"
+                }
+            },
+        ])
 
+        prev_user = -1
+        prev_activity = -1
+
+        #trackpoint times
+        prev_track_time = -1
+        current_track_time = -1
+
+        # if an activity is found to be invalid, skip past it
+        invalid_activity = -1
+        invalid_count = 0
+
+        # users with unvalid activities and count [id, count]
+        users = []
+
+        for r in result:
+            user_id = r["_id"]
+            curr_activity = r["activity_id"]
+            current_track_time = r["date_time"]
+
+            #current activity already set to invalid, skip
+            if invalid_activity == curr_activity:
+                continue
+
+            #new user, reset counter and insert start data
+            if prev_user != user_id:
+                #add user with invalid activities
+                if invalid_count != 0:
+                    users.append([user_id, invalid_count])
+
+                prev_user = user_id
+                invalid_count = 0
+                prev_activity = r["activity_id"]
+                current_track_time = r["date_time"]
+                prev_track_time = r["date_time"]
+
+            #new activity, set counter
+            if curr_activity != prev_activity:
+                prev_activity = r["activity_id"]
+                current_track_time = r["date_time"]
+                prev_track_time = r["date_time"]
+
+            #invalid activity, set invalid
+            if datetime.fromisoformat(current_track_time) - datetime.fromisoformat(prev_track_time) >= timedelta(minutes=5):
+                invalid_count += 1
+                invalid_activity = curr_activity  # set cur activity to invalid
+
+            #new prev time
+            prev_track_time = current_track_time
+
+        return users
+  
 def main():
     program = None
     try:
@@ -397,8 +486,8 @@ def main():
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
         where the timestamps deviate with at least 5 minutes. """
-        #print("Users with invalid activities: ")
-        #pprint(program.find_all_users_with_invalid_activities())
+        # print("Users with invalid activities: ")
+        # pprint(program.find_all_users_with_invalid_activities())
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
