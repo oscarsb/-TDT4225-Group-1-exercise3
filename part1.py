@@ -1,3 +1,4 @@
+from datetime import datetime
 from pprint import pprint 
 from DbConnector import DbConnector
 import constants
@@ -13,7 +14,7 @@ class DBhandler:
         self.client = self.connection.client
         self.db = self.connection.db
         
-        self.collections = ["User", "TrackPoint"]
+        self.collections = ["User", "ActivityTrackPoint"]
         self.activity_id = 1
         self.trackpoint_id = 1
         
@@ -97,7 +98,7 @@ class DBhandler:
         # adds user with activities when trackpoints are inserted and activities retrieved
         for user in tqdm(users, ncols=100, leave=False, desc="Inserting data from all users"):
             user_format = {
-                "_id": f"{user[0]}",
+                "_id": f"{int(user[0])}",
                 "has_labels": user[1],
                 "activities": self.get_user_activities_and_insert_trackpoints(user[0])
             }
@@ -133,9 +134,16 @@ class DBhandler:
             # format each trackPoint and add all values to list
             for line in track_raw:
                 formated = line.replace(",", " ").split()
-                # change date and time format to match datetime
+                # change date and time format to datetime
                 formated[5] = f"{formated[5]} {formated[6]}"
+                formated[5] = datetime.strptime(formated[5], '%Y-%m-%d %H:%M:%S')
                 formated.remove(formated[-1])  # remove time
+                # change values to int
+                formated[0] = float(formated[0])
+                formated[1] = float(formated[1])
+                formated[2] = int(formated[2])
+                formated[3] = float(formated[3])
+                formated[4] = float(formated[4])
 
                 track_points.append(formated)
                 
@@ -154,10 +162,10 @@ class DBhandler:
             
             # create activity doc
             doc = {
-                "_id": f"{self.activity_id}",
-                "transportation_mode": f"{transportation}",
-                "start_date_time": f"{startDatetime}",
-                "end_date_time": f"{endDatetime}"
+                "_id": self.activity_id,
+                "transportation_mode": transportation,
+                "start_date_time": startDatetime,
+                "end_date_time": endDatetime
             }
             self.activity_id += 1
             activities.append(doc)
@@ -167,7 +175,7 @@ class DBhandler:
     def insert_trackpoint_documents(self, trackpoints):      
         """Inserts list of trackpoints, 
         assumes TrackPoint table exists"""  
-        docs = []          
+        points = []          
         
         for track in trackpoints:
             track_format = {
@@ -175,23 +183,27 @@ class DBhandler:
                 "lat": track[0],
                 "lon": track[1],
                 "altitude": track[3],
-                "date_time": f"{track[5]}",
-                "activity_id": self.activity_id
+                "date_time": f"{track[5]}"
             }
-            docs.append(track_format)
+            points.append(track_format)
             self.trackpoint_id += 1
+
+        doc = {
+            "_id": self.activity_id,
+            "trackpoints": points
+        }
             
-        collection = self.db["TrackPoint"]
-        collection.insert_many(docs)
+        collection = self.db["ActivityTrackPoint"]
+        collection.insert_one(doc)
 
 
 def main():
     program = None
     try:
         program = DBhandler()
-        #program.drop_collections()
-        #program.create_collections()
-        #program.insert_data()
+        program.drop_collections()
+        program.create_collections()
+        program.insert_data()
     except Exception as e:
         print("ERROR: Failed to use database:", e)
     finally:
