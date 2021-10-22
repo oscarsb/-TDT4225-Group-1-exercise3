@@ -1,5 +1,4 @@
 from datetime import datetime
-from pprint import pprint 
 from DbConnector import DbConnector
 import constants
 from pathlib import Path
@@ -22,11 +21,8 @@ class DBhandler:
         self.userpath = Path(str(self.datapath) + r"\Data")
         self.all_users = os.listdir(self.userpath)  # all users in dataset
 
-    def print_documents(self, collection_name):
-        collection = self.db[collection_name]
-        documents = collection.find({})
-        for doc in documents: 
-            pprint(doc)
+        with open(Path(str(self.datapath) + r"\labeled_ids.txt"), 'r') as f:
+            self.labeled_users = f.read().splitlines()  # all users with labels
 
     def drop_collections(self):
         """Drop collections"""
@@ -66,6 +62,9 @@ class DBhandler:
                     val = val.replace("_", " ")
                     tmp_label.append(val)
 
+                tmp_label[0] = datetime.strptime(tmp_label[0], '%Y-%m-%d %H:%M:%S')
+                tmp_label[1] = datetime.strptime(tmp_label[1], '%Y-%m-%d %H:%M:%S')
+
                 label_formated.append(tmp_label)  # add formated label data
 
         return label_formated
@@ -98,7 +97,7 @@ class DBhandler:
         # adds user with activities when trackpoints are inserted and activities retrieved
         for user in tqdm(users, ncols=100, leave=False, desc="Inserting data from all users"):
             user_format = {
-                "_id": f"{int(user[0])}",
+                "_id": int(user[0]),
                 "has_labels": user[1],
                 "activities": self.get_user_activities_and_insert_trackpoints(user[0])
             }

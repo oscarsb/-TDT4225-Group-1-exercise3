@@ -11,12 +11,6 @@ class DBhandler:
         self.client = self.connection.client
         self.db = self.connection.db 
 
-    def print_documents(self, collection_name):
-        collection = self.db[collection_name]
-        documents = collection.find({})
-        for doc in documents: 
-            pprint(doc)
-
     def get_num_user(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
@@ -335,18 +329,12 @@ class DBhandler:
             {
                 "$group": {
                     "_id": {
-                        "year": { "$year": { 
-                            "$dateFromString": { 
-                                "format": "%Y-%m-%d %H:%M:%S",
-                                "dateString": "$activities.start_date_time"
-                            }
-                        }},
-                        "month": { "$month": { 
-                            "$dateFromString": { 
-                                "format": "%Y-%m-%d %H:%M:%S",
-                                "dateString": "$activities.start_date_time"
-                            }
-                        }}
+                        "year": { "$year": 
+                            "$activities.start_date_time"
+                        },
+                        "month": { "$month": 
+                            "$activities.start_date_time"
+                        }
                     },
                     "count": { "$sum": 1 }
                 }
@@ -374,14 +362,8 @@ class DBhandler:
                     "$cond": [
                         { 
                             "$and": [ 
-                                { "$eq": [ { "$year": { "$dateFromString": { 
-                                    "format": "%Y-%m-%d %H:%M:%S",
-                                    "dateString": "$activities.start_date_time" 
-                                }}}, year ]},
-                                { "$eq": [ { "$month": { "$dateFromString": { 
-                                    "format": "%Y-%m-%d %H:%M:%S",
-                                    "dateString": "$activities.start_date_time" 
-                                }}}, month ]}
+                                { "$eq": [ { "$year": "$activities.start_date_time" }, year ]},
+                                { "$eq": [ { "$month": "$activities.start_date_time" }, month ]}
                             ] 
                         },
                         "$$KEEP",
@@ -398,18 +380,8 @@ class DBhandler:
                         "$sum": {
                             "$divide": [{ 
                                 "$subtract": [
-                                    { 
-                                        "$dateFromString": { 
-                                            "format": "%Y-%m-%d %H:%M:%S",
-                                            "dateString": "$activities.end_date_time"
-                                        }
-                                    },
-                                    { 
-                                        "$dateFromString": { 
-                                            "format": "%Y-%m-%d %H:%M:%S",
-                                            "dateString": "$activities.start_date_time"
-                                        }
-                                    }
+                                    "$activities.end_date_time",
+                                    "$activities.start_date_time"
                                 ]
                             }, 3600000]
                         }
@@ -436,7 +408,7 @@ class DBhandler:
             # get user 112's walking activities
             { 
                 "$match": {
-                    "_id" : f"{user_id}",
+                    "_id" : user_id,
                     "activities.transportation_mode" : "walk"
                 }
             },
@@ -444,20 +416,19 @@ class DBhandler:
             { 
                 "$redact": {
                     "$cond": [
-                        { "$eq": [ { "$year": { "$dateFromString": { 
-                            "format": "%Y-%m-%d %H:%M:%S",
-                            "dateString": "$activities.start_date_time" 
-                        }}}, year ]},
+                        { "$eq": [ { "$year": 
+                            "$activities.start_date_time" 
+                        }, year ]},
                         "$$KEEP",
                         "$$PRUNE"
                     ]
                 }
             },
-            # convert activity id to int
+            # project ids
             {
                 "$project": { 
                     "_id": 0, 
-                    "activity_id": { "$toInt": "$activities._id" }
+                    "activity_id": "$activities._id"
                 }
             },
             # merge with trackpoints
@@ -507,11 +478,11 @@ class DBhandler:
             {
                 "$unwind": "$activities"
             },
-            # convert activity id to int
+            # project ids
             {
                 "$project": { 
                     "_id": 1, 
-                    "activity_id": { "$toInt": "$activities._id" }
+                    "activity_id": "$activities._id"
                 }
             },
             # merge with trackpoints
@@ -572,11 +543,11 @@ class DBhandler:
             {
                 "$unwind": "$activities"
             },
-            # convert activity id to int
+            # project ids
             {
                 "$project": {
                     "_id": 1,
-                    "activity_id": 1
+                    "activity_id": "$activities._id"
                 }
             },
             # merge with trackpoints
