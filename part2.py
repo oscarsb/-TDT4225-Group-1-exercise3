@@ -34,7 +34,7 @@ class DBhandler:
     def get_num_activity(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" useer and activity
+            # "merge" user and activity
             {
                 "$unwind": "$activities"
             },
@@ -245,14 +245,14 @@ class DBhandler:
             {
                 "$unwind": "$activity_trackpoints.trackpoints"
             },
-                {
+            {
                 "$project": {
                     "_id": 1,
                     "activity_id": 1,
                     "trackpoint_id": "$activity_trackpoints.trackpoints._id",
                     "lat": "$activity_trackpoints.trackpoints.lat",
                     "lon": "$activity_trackpoints.trackpoints.lon",
-                    "trackTime" : "$activity_trackpoints.trackpoints.datetime",
+                    "datetime" : "$activity_trackpoints.trackpoints.date_time",
                 }
             },
         ])
@@ -260,7 +260,18 @@ class DBhandler:
         res = []
         for r in result:
             res.append(r)
-        print(res)
+        
+        closeUsers = []
+        for user in res:
+            delta = abs((datetime.fromisoformat(user["datetime"]).second-datetime.fromisoformat("2008-08-24 15:38:00").second))
+            dist = haversine((user["lat"], user["lon"]), (39.97548, 116.33031))
+
+            if(delta <= 60 and dist/1000 <= 100 and not user["_id"] in closeUsers):
+                closeUsers.append(user["_id"])
+            
+
+        print(closeUsers)
+
 
     def find_users_with_no_taxi(self):
         userCollection = self.db["User"]
@@ -681,7 +692,7 @@ def main():
         person in time and space (pandemic tracking). Close is defined as the same
         minute (60 seconds) and space (100 meters). (This is a simplification of the
         “unsolvable” problem given i exercise 2). """
-        print("The number of users which have been close to each other:")
+        print("Users who have been close to the infected:", "\n")
         print(program.get_number_of_close_users())
 
         """ 7. Find all users that have never taken a taxi. """
