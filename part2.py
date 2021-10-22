@@ -28,7 +28,7 @@ class DBhandler:
     def get_num_activity(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activity
+            # unpack activity
             {
                 "$unwind": "$activities"
             },
@@ -46,7 +46,7 @@ class DBhandler:
     def get_num_trackpoint(self):
         userCollection = self.db["ActivityTrackPoint"]
         result = userCollection.aggregate([
-            # "merge" activity and trackpoints
+            # unpack trackpoints
             {
                 "$unwind": "$trackpoints"
             },
@@ -257,14 +257,13 @@ class DBhandler:
         
         closeUsers = []
         for user in res:
-            delta = abs((datetime.fromisoformat(user["datetime"]).second-datetime.fromisoformat("2008-08-24 15:38:00").second))
-            dist = haversine((user["lat"], user["lon"]), (39.97548, 116.33031))
+            delta = abs((datetime.fromisoformat(user["datetime"])-datetime.fromisoformat("2008-08-24 15:38:00")))
+            dist = haversine((user["lat"], user["lon"]), (39.97548, 116.33031), unit=Unit.METERS)
 
-            if(delta <= 60 and dist/1000 <= 100 and not user["_id"] in closeUsers):
+            if(delta.total_seconds() <= 60 and dist <= 100 and not user["_id"] in closeUsers):
                 closeUsers.append(user["_id"])
             
-
-        print(closeUsers)
+        return closeUsers
 
 
     def find_users_with_no_taxi(self):
@@ -284,7 +283,7 @@ class DBhandler:
     def count_users_per_transport_mode(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -321,7 +320,7 @@ class DBhandler:
     def find_date_with_most_activities(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -352,7 +351,7 @@ class DBhandler:
         year, month = self.find_date_with_most_activities()
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -401,7 +400,7 @@ class DBhandler:
     def find_distance_walked_in_year_by_user(self, year, user_id):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -474,7 +473,7 @@ class DBhandler:
     def find_20_users_with_most_altitude_gain(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -539,7 +538,7 @@ class DBhandler:
     def find_all_users_with_invalid_activities(self):
         userCollection = self.db["User"]
         result = userCollection.aggregate([
-            # "merge" user and activities
+            # unpack activities
             {
                 "$unwind": "$activities"
             },
@@ -635,76 +634,76 @@ def main():
 
         """ 1. How many users, activities and trackpoints are there in the dataset (after it is
         inserted into the database). """
-        #print("Number of users: ", program.get_num_user())
-        #print("Number of activities: ", program.get_num_activity())
-        #print("Number of trackpoints: ", program.get_num_trackpoint(), "\n")
+        print("Number of users: ", program.get_num_user())
+        print("Number of activities: ", program.get_num_activity())
+        print("Number of trackpoints: ", program.get_num_trackpoint(), "\n")
 
         """ 2. Find the average, minimum and maximum number of activities per user. """
-        #avg_activity_for_all_users = program.get_avg_activities_for_user()
-        #print("Avrage activities for all users: ", avg_activity_for_all_users, "≈", round(avg_activity_for_all_users, 1))
-        #print("Maximum number of activities: ", program.get_max_activities_for_user())
-        #print("Minimum number of activities: ", program.get_min_activities_for_user())
+        avg_activity_for_all_users = program.get_avg_activities_for_user()
+        print("Avrage activities for all users: ", avg_activity_for_all_users, "≈", round(avg_activity_for_all_users, 1))
+        print("Maximum number of activities: ", program.get_max_activities_for_user())
+        print("Minimum number of activities: ", program.get_min_activities_for_user(), "\n")
 
         """ 3. Find the top 10 users with the highest number of activities. """
-        #print("Top 10 users with the highest number of activities:")
-        #headers = ["User id", "Number of activities"]
-        #print(tabulate(program.get_top_10_users_with_most_activities(), headers=headers), "\n")
+        print("Top 10 users with the highest number of activities:")
+        headers = ["User id", "Number of activities"]
+        print(tabulate(program.get_top_10_users_with_most_activities(), headers=headers), "\n")
 
         """ 4. Find the number of users that have started the activity in one day and ended
         the activity the next day. """
-        #print("Number of users that have an activity that ended the day after it started: ", program.ended_activity_at_the_next_day())
+        print("Number of users that have an activity that ended the day after it started: ", program.ended_activity_at_the_next_day())
 
         """ 5. Find activities that are registered multiple times. You should find the query
         even if you get zero results. """
-        #print("Number of same activities: ", program.get_same_activities())
+        print("Number of same activities: ", program.get_same_activities(), "\n")
 
         """ 6. An infected person has been at position (lat, lon) (39.97548, 116.33031) at
         time ‘2008-08-24 15:38:00’. Find the user_id(s) which have been close to this
         person in time and space (pandemic tracking). Close is defined as the same
         minute (60 seconds) and space (100 meters). (This is a simplification of the
         “unsolvable” problem given i exercise 2). """
-        print("Users who have been close to the infected:", "\n")
-        print(program.get_number_of_close_users())
+        print("Users who have been close to the infected:")
+        print(program.get_number_of_close_users(), "\n")
 
         """ 7. Find all users that have never taken a taxi. """
-        #print("Users that have never taken a taxi:")
-        #print(program.find_users_with_no_taxi(), "\n")
+        print("Users that have never taken a taxi:")
+        print(program.find_users_with_no_taxi(), "\n")
 
         """ 8. Find all types of transportation modes and count how many distinct users that 
         have used the different transportation modes. Do not count the rows where the
         transportation mode is null. """
-        #print("Number of distinct users that have used the different transportation modes:")
-        #headers = ["Transportation mode", "Number of users"]
-        #print(tabulate(program.count_users_per_transport_mode(), headers=headers), "\n")
+        print("Number of distinct users that have used the different transportation modes:")
+        headers = ["Transportation mode", "Number of users"]
+        print(tabulate(program.count_users_per_transport_mode(), headers=headers), "\n")
 
         """ 9. a) Find the year and month with the most activities. """
-        #print("The year and month with the most activities:")
-        #print(program.find_date_with_most_activities(), "\n")
+        print("The year and month with the most activities:")
+        print(program.find_date_with_most_activities(), "\n")
 
         """ 9. b) Which user had the most activities this year and month, and how many
         recorded hours do they have? Do they have more hours recorded than the user
         with the second most activities? """
-        #print("The two users with the most activities that year and month:")
-        #headers = ["User id", "Number of activities", "Hours recorded"]
-        #print(tabulate(program.find_user_with_most_activities(), headers=headers), "\n")
+        print("The two users with the most activities that year and month:")
+        headers = ["User id", "Number of activities", "Hours recorded"]
+        print(tabulate(program.find_user_with_most_activities(), headers=headers), "\n")
 
         """ 10. Find the total distance (in km) walked in 2008, by user with id=112. """
-        #print("Total distance walked by user 112 in 2008:")
-        #print(program.find_distance_walked_in_year_by_user(2008, 112), "km\n")
+        print("Total distance walked by user 112 in 2008:")
+        print(program.find_distance_walked_in_year_by_user(2008, 112), "km\n")
 
         """ 11. Find the top 20 users who have gained the most altitude meters.
             Output should be a table with (id, total meters gained per user).
             Remember that some altitude-values are invalid
             Tip: (tpn.altitude-tpn-1.altitude), tpn.altitude >tpn-1.altitude """
-        #print("Top 20 users who have gained the most altitude meters:")
-        #headers=["User id", "Altitude gained"]
-        #print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers), "\n")
+        print("Top 20 users who have gained the most altitude meters:")
+        headers=["User id", "Altitude gained"]
+        print(tabulate(program.find_20_users_with_most_altitude_gain(), headers=headers), "\n")
 
         """ 12. Find all users who have invalid activities, and the number of invalid activities 
         per user. An invalid activity is defined as an activity with consecutive trackpoints
         where the timestamps deviate with at least 5 minutes. """
-        #print("Users with invalid activities: ")
-        #pprint(program.find_all_users_with_invalid_activities())
+        print("Users with invalid activities: ")
+        pprint(program.find_all_users_with_invalid_activities())
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
