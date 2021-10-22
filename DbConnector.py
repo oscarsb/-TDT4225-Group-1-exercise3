@@ -1,4 +1,4 @@
-from pymongo import MongoClient, version
+from pymongo import MongoClient
 from decouple import config
 
 class DbConnector:
